@@ -1,6 +1,6 @@
-fastapi==0.74.*
-requests==2.27.*
-huggingface_hub==0.11.*
+fastapi==0.104.*
+requests==2.31.*
+huggingface-hub==0.20.*
 uvicorn[standard]==0.17.*
 numpy==1.25.*
 datasets==2.16.*
