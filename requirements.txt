@@ -1,0 +1,8 @@
+fastapi==0.74.*
+requests==2.27.*
+huggingface_hub==0.11.*
+uvicorn[standard]==0.17.*
+numpy==1.25.*
+datasets==2.16.*
+langchain==0.0.*
+aiohttp==3.8.*
