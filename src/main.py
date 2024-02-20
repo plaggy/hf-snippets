@@ -7,7 +7,7 @@ import os
 import tempfile
 import requests
 
-from fastapi import FastAPI, Header, HTTPException, BackgroundTasks
+from fastapi import FastAPI, BackgroundTasks
 from fastapi.responses import FileResponse
 
 from aiohttp import ClientSession
@@ -17,7 +17,6 @@ from tqdm import tqdm
 from tqdm.asyncio import tqdm_asyncio
 
 from src.models import chunk_config, embed_config, WebhookPayload
-
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -41,10 +40,7 @@ async def post_webhook(
     if not (
             payload.event.action == "update"
             and payload.event.scope.startswith("repo.content")
-            and (
-                payload.repo.name == embed_config.input_dataset
-                # or payload.repo.name == chunk_config.input_dataset
-            )
+            # and payload.repo.name == chunk_config.input_dataset # any input dataset
             and payload.repo.type == "dataset"
     ):
         # no-op
@@ -93,7 +89,7 @@ def chunk_generator(input_dataset, chunker):
 
 def chunk_dataset():
     logger.info("Update detected, chunking is scheduled")
-    input_ds = load_dataset(chunk_config.input_dataset, split=chunk_config.input_splits)
+    input_ds = load_dataset(chunk_config.input_dataset, split="+".join(chunk_config.input_splits))
     chunker = Chunker(
         strategy=chunk_config.strategy,
         split_seq=chunk_config.split_seq,
@@ -123,7 +119,7 @@ def chunk_dataset():
 EMBEDDING
 """
 
-async def embed_sent(sentence, semaphore, tei_url, tmp_file):
+async def embed_sent(sentence, semaphore, tmp_file):
     async with semaphore:
         payload = {
             "inputs": sentence,
@@ -136,7 +132,7 @@ async def embed_sent(sentence, semaphore, tei_url, tmp_file):
                     "Authorization": f"Bearer {HF_TOKEN}"
                 }
         ) as session:
-            async with session.post(tei_url, json=payload) as resp:
+            async with session.post(TEI_URL, json=payload) as resp:
                 if resp.status != 200:
                     raise RuntimeError(await resp.text())
                 result = await resp.json()
@@ -146,10 +142,10 @@ async def embed_sent(sentence, semaphore, tei_url, tmp_file):
                 )
 
 
-async def embed(input_ds, tei_url, temp_file):
+async def embed(input_ds, temp_file):
     semaphore = asyncio.BoundedSemaphore(embed_config.semaphore_bound)
     jobs = [
-        asyncio.create_task(embed_sent(row[chunk_config.input_text_col], semaphore, tei_url, temp_file))
+        asyncio.create_task(embed_sent(row[chunk_config.input_text_col], semaphore, temp_file))
         for row in input_ds if row[chunk_config.input_text_col].strip()
     ]
     logger.info(f"num chunks to embed: {len(jobs)}")
@@ -160,20 +156,24 @@ async def embed(input_ds, tei_url, temp_file):
 
 
 def wake_up_endpoint(url):
+    n_loop = 0
     while requests.get(
         url=url,
         headers={"Authorization": f"Bearer {HF_TOKEN}"}
     ).status_code != 200:
         time.sleep(2)
+        n_loop += 1
+        if n_loop > 10:
+            raise TimeoutError("TEI endpoint is unavailable")
     logger.info("TEI endpoint is up")
 
 
 def embed_dataset():
     logger.info("Update detected, embedding is scheduled")
-    wake_up_endpoint(embed_config.tei_url)
-    input_ds = load_dataset(embed_config.input_dataset, split=embed_config.input_splits)
+    wake_up_endpoint(TEI_URL)
+    input_ds = load_dataset(embed_config.input_dataset, split="+".join(chunk_config.input_splits))
     with tempfile.NamedTemporaryFile(mode="a", suffix=".jsonl") as temp_file:
-        asyncio.run(embed(input_ds, embed_config.tei_url, temp_file))
+        asyncio.run(embed(input_ds, temp_file))
 
         dataset = Dataset.from_json(temp_file.name)
         dataset.push_to_hub(
@@ -183,3 +183,10 @@ def embed_dataset():
         )
 
     logger.info("Done embedding")
+
+
+# For debugging
+
+# import uvicorn
+# if __name__ == "__main__":
+#     uvicorn.run(app, host="0.0.0.0", port=7860)
