@@ -25,6 +25,7 @@ HF_TOKEN = os.getenv("HF_TOKEN")
 TEI_URL = os.getenv("TEI_URL")
 
 app = FastAPI()
+app.state.last_Sha = None
 
 
 @app.get("/")
@@ -40,16 +41,17 @@ async def post_webhook(
     if not (
             payload.event.action == "update"
             and payload.event.scope.startswith("repo.content")
-            # and payload.repo.name == chunk_config.input_dataset # any input dataset
+            and payload.repo.name == chunk_config.input_dataset
             and payload.repo.type == "dataset"
+            and (not app.state.last_Sha or app.state.last_Sha != payload.repo.headSha)
     ):
         # no-op
         logger.info("Update detected, no action taken")
         return {"processed": False}
 
-    if payload.repo.name == chunk_config.input_dataset:
-        task_queue.add_task(chunk_dataset)
-        task_queue.add_task(embed_dataset)
+    app.state.last_Sha = payload.repo.headSha
+    task_queue.add_task(chunk_dataset)
+    task_queue.add_task(embed_dataset)
 
     return {"processed": True}
 
@@ -187,6 +189,6 @@ def embed_dataset():
 
 # For debugging
 
-# import uvicorn
-# if __name__ == "__main__":
-#     uvicorn.run(app, host="0.0.0.0", port=7860)
+import uvicorn
+if __name__ == "__main__":
+    uvicorn.run(app, host="0.0.0.0", port=7860)
