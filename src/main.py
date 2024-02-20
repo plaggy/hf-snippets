@@ -111,7 +111,6 @@ def chunk_dataset():
     )
 
     logger.info("Done chunking")
-
     return {"processed": True}
 
 
@@ -183,6 +182,7 @@ def embed_dataset():
         )
 
     logger.info("Done embedding")
+    return {"processed": True}
 
 
 # For debugging
