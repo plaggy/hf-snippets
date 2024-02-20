@@ -163,7 +163,7 @@ def wake_up_endpoint(url):
     ).status_code != 200:
         time.sleep(2)
         n_loop += 1
-        if n_loop > 10:
+        if n_loop > 30:
             raise TimeoutError("TEI endpoint is unavailable")
     logger.info("TEI endpoint is up")
 
