@@ -10,7 +10,6 @@ WORKDIR $HOME/app
 
 COPY --chown=user requirements.txt requirements.txt
 RUN pip install --no-cache-dir --upgrade -r requirements.txt
-RUN python -m spacy download en_core_web_sm
 
 COPY --chown=user . .
 

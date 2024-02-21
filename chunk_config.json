@@ -1,9 +1,7 @@
 {
-    "input_dataset": "sergeipetrov/transformers-diffusers-docs-raw",
 	"input_splits": ["train"],
 	"input_text_col": "text",
-	"output_dataset": "sergeipetrov/transformers-diffusers-docs-chunked",
-	"strategy": "spacy",
+	"strategy": "recursive",
 	"split_seq": "\n\n",
 	"chunk_len": 512,
 	"private": "false"

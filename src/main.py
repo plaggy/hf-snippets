@@ -11,7 +11,7 @@ from fastapi import FastAPI, BackgroundTasks
 from fastapi.responses import FileResponse
 
 from aiohttp import ClientSession
-from langchain.text_splitter import SpacyTextSplitter
+from langchain.text_splitter import RecursiveCharacterTextSplitter
 from datasets import Dataset, load_dataset
 from tqdm import tqdm
 from tqdm.asyncio import tqdm_asyncio
@@ -22,7 +22,12 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 HF_TOKEN = os.getenv("HF_TOKEN")
+
 TEI_URL = os.getenv("TEI_URL")
+CHUNKED_DS_NAME = os.getenv("CHUNKED_DS_NAME")
+EMBED_DS_NAME = os.getenv("EMBED_DS_NAME")
+INPUT_SPLITS = os.getenv("INPUT_SPLITS")
+INPUT_TEXT_COL = os.getenv("INPUT_TEXT_COL")
 
 app = FastAPI()
 app.state.last_Sha = None
@@ -39,19 +44,19 @@ async def post_webhook(
         task_queue: BackgroundTasks
 ):
     if not (
-            payload.event.action == "update"
-            and payload.event.scope.startswith("repo.content")
-            and payload.repo.name == chunk_config.input_dataset
-            and payload.repo.type == "dataset"
-            and (not app.state.last_Sha or app.state.last_Sha != payload.repo.headSha)
+        payload.event.action == "update"
+        and payload.event.scope.startswith("repo.content")
+        and payload.repo.type == "dataset"
+        # webhook posts multiple requests with the same update, this addresses that
+        and (not app.state.last_Sha or app.state.last_Sha != payload.repo.headSha)
     ):
         # no-op
         logger.info("Update detected, no action taken")
         return {"processed": False}
 
     app.state.last_Sha = payload.repo.headSha
-    task_queue.add_task(chunk_dataset)
-    task_queue.add_task(embed_dataset)
+    task_queue.add_task(chunk_dataset, ds_name=payload.repo.name)
+    task_queue.add_task(embed_dataset, ds_name=CHUNKED_DS_NAME)
 
     return {"processed": True}
 
@@ -61,11 +66,14 @@ CHUNKING
 """
 
 class Chunker:
-    def __init__(self, strategy, split_seq, chunk_len):
+    def __init__(self, strategy, split_seq=".", chunk_len=512):
         self.split_seq = split_seq
         self.chunk_len = chunk_len
-        if strategy == "spacy":
-            self.split = SpacyTextSplitter().split_text
+        if strategy == "recursive":
+            self.split = RecursiveCharacterTextSplitter(
+                chunk_size=chunk_len,
+                separators=[split_seq]
+            ).split_text
         if strategy == "sequence":
             self.split = self.seq_splitter
         if strategy == "constant":
@@ -83,15 +91,15 @@ class Chunker:
 
 def chunk_generator(input_dataset, chunker):
     for i in tqdm(range(len(input_dataset))):
-        chunks = chunker.split(input_dataset[i][chunk_config.input_text_col])
+        chunks = chunker.split(input_dataset[i][INPUT_TEXT_COL])
         for chunk in chunks:
             if chunk:
-                yield {chunk_config.input_text_col: chunk}
+                yield {INPUT_TEXT_COL: chunk}
 
 
-def chunk_dataset():
+def chunk_dataset(ds_name):
     logger.info("Update detected, chunking is scheduled")
-    input_ds = load_dataset(chunk_config.input_dataset, split="+".join(chunk_config.input_splits))
+    input_ds = load_dataset(ds_name, split="+".join(INPUT_SPLITS))
     chunker = Chunker(
         strategy=chunk_config.strategy,
         split_seq=chunk_config.split_seq,
@@ -140,15 +148,15 @@ async def embed_sent(sentence, semaphore, tmp_file):
                 result = await resp.json()
 
                 tmp_file.write(
-                    json.dumps({"vector": result[0], chunk_config.input_text_col: sentence}) + "\n"
+                    json.dumps({"vector": result[0], INPUT_TEXT_COL: sentence}) + "\n"
                 )
 
 
 async def embed(input_ds, temp_file):
     semaphore = asyncio.BoundedSemaphore(embed_config.semaphore_bound)
     jobs = [
-        asyncio.create_task(embed_sent(row[chunk_config.input_text_col], semaphore, temp_file))
-        for row in input_ds if row[chunk_config.input_text_col].strip()
+        asyncio.create_task(embed_sent(row[INPUT_TEXT_COL], semaphore, temp_file))
+        for row in input_ds if row[INPUT_TEXT_COL].strip()
     ]
     logger.info(f"num chunks to embed: {len(jobs)}")
 
@@ -158,6 +166,7 @@ async def embed(input_ds, temp_file):
 
 
 def wake_up_endpoint(url):
+    logger.info("Starting up TEI endpoint")
     n_loop = 0
     while requests.get(
         url=url,
@@ -170,10 +179,10 @@ def wake_up_endpoint(url):
     logger.info("TEI endpoint is up")
 
 
-def embed_dataset():
+def embed_dataset(ds_name):
     logger.info("Update detected, embedding is scheduled")
     wake_up_endpoint(TEI_URL)
-    input_ds = load_dataset(embed_config.input_dataset, split="+".join(chunk_config.input_splits))
+    input_ds = load_dataset(ds_name, split="+".join(INPUT_SPLITS))
     with tempfile.NamedTemporaryFile(mode="a", suffix=".jsonl") as temp_file:
         asyncio.run(embed(input_ds, temp_file))
 

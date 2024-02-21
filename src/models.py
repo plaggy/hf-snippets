@@ -5,21 +5,13 @@ from typing import Literal
 
 
 class ChunkConfig(BaseModel):
-	input_dataset: str
-	input_splits: list[str]
-	input_text_col: str
-	output_dataset: str
-	strategy: Literal["spacy", "sequence", "constant"]
-	split_seq: str | list[str]
+	strategy: Literal["recursive", "sequence", "constant"]
+	split_seq: str
 	chunk_len: int
 	private: bool
 
 
 class EmbedConfig(BaseModel):
-	input_dataset: str
-	input_splits: list[str]
-	input_text_col: str
-	output_dataset: str
 	private: bool
 	semaphore_bound: int
 

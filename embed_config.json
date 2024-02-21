@@ -1,8 +1,6 @@
 {
-    "input_dataset": "sergeipetrov/transformers-diffusers-docs-chunked",
 	"input_splits": ["train"],
 	"input_text_col": "text",
-	"output_dataset": "sergeipetrov/transformers-diffusers-docs-embed",
 	"private": "false",
     "semaphore_bound": 5
 }
