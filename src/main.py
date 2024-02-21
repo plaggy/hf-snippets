@@ -29,6 +29,8 @@ EMBED_DS_NAME = os.getenv("EMBED_DS_NAME")
 INPUT_SPLITS = os.getenv("INPUT_SPLITS")
 INPUT_TEXT_COL = os.getenv("INPUT_TEXT_COL")
 
+INPUT_SPLITS = [spl.strip() for spl in INPUT_SPLITS.split(",") if spl]
+
 app = FastAPI()
 app.state.last_Sha = None
 
