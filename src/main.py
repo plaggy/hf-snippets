@@ -117,7 +117,7 @@ def chunk_dataset(ds_name):
     )
 
     dataset.push_to_hub(
-        chunk_config.output_dataset,
+        CHUNKED_DS_NAME,
         private=chunk_config.private,
         token=HF_TOKEN
     )
@@ -190,7 +190,7 @@ def embed_dataset(ds_name):
 
         dataset = Dataset.from_json(temp_file.name)
         dataset.push_to_hub(
-            embed_config.output_dataset,
+            EMBED_DS_NAME,
             private=embed_config.private,
             token=HF_TOKEN
         )
@@ -201,6 +201,6 @@ def embed_dataset(ds_name):
 
 # For debugging
 
-import uvicorn
-if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=7860)
+# import uvicorn
+# if __name__ == "__main__":
+#     uvicorn.run(app, host="0.0.0.0", port=7860)
