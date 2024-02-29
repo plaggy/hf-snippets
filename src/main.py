@@ -141,8 +141,7 @@ async def embed_sent(sentence, semaphore, tmp_file):
             headers={
                 "Content-Type": "application/json",
                 "Authorization": f"Bearer {HF_TOKEN}"
-            },
-            trust_env=True
+            }
         ) as session:
             async with session.post(TEI_URL, json=payload) as resp:
                 if resp.status != 200:
