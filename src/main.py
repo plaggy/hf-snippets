@@ -21,12 +21,18 @@ from src.models import chunk_config, embed_config, WebhookPayload
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# you token from Settings
 HF_TOKEN = os.getenv("HF_TOKEN")
 
+# URL of TEI endpoint
 TEI_URL = os.getenv("TEI_URL")
+# name of chunked dataset
 CHUNKED_DS_NAME = os.getenv("CHUNKED_DS_NAME")
+# name of embeddings dataset
 EMBED_DS_NAME = os.getenv("EMBED_DS_NAME")
+# splits of input dataset to process, comma separated
 INPUT_SPLITS = os.getenv("INPUT_SPLITS")
+# name of column to load from input dataset
 INPUT_TEXT_COL = os.getenv("INPUT_TEXT_COL")
 
 INPUT_SPLITS = [spl.strip() for spl in INPUT_SPLITS.split(",") if spl]
@@ -183,7 +189,7 @@ def wake_up_endpoint(url):
 def embed_dataset(ds_name):
     logger.info("Update detected, embedding is scheduled")
     wake_up_endpoint(TEI_URL)
-    input_ds = load_dataset(ds_name, split="+".join(INPUT_SPLITS))
+    input_ds = load_dataset(ds_name, split="train")
     with tempfile.NamedTemporaryFile(mode="a", suffix=".jsonl") as temp_file:
         asyncio.run(embed(input_ds, temp_file))
 
