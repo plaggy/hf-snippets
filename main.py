@@ -37,7 +37,7 @@ INPUT_SPLITS = os.getenv("INPUT_SPLITS")
 # name of column to load from input dataset
 INPUT_TEXT_COL = os.getenv("INPUT_TEXT_COL")
 
-# INPUT_SPLITS = [spl.strip() for spl in INPUT_SPLITS.split(",") if spl]
+INPUT_SPLITS = [spl.strip() for spl in INPUT_SPLITS.split(",") if spl]
 
 app = FastAPI()
 app.state.seen_Sha = set()
@@ -45,10 +45,10 @@ app.state.seen_Sha = set()
 app.mount("/static", StaticFiles(directory="static"), name="static")
 templates = Jinja2Templates(directory="templates")
 
+
 @app.get("/", response_class=HTMLResponse)
 async def root(request: Request):
     return templates.TemplateResponse(request=request, name="index.html")
-    # return FileResponse("/Users/spetrov/Documents/PROJECTS/hub_etl_pipeline/auto-chunk-embed/templates/index.html")
 
 
 @app.post("/webhook")
@@ -211,6 +211,6 @@ def embed_dataset(ds_name):
 
 # For debugging
 
-import uvicorn
-if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=7860)
+# import uvicorn
+# if __name__ == "__main__":
+#     uvicorn.run(app, host="0.0.0.0", port=7860)
