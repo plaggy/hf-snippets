@@ -38,7 +38,7 @@ INPUT_TEXT_COL = os.getenv("INPUT_TEXT_COL")
 INPUT_SPLITS = [spl.strip() for spl in INPUT_SPLITS.split(",") if spl]
 
 app = FastAPI()
-app.state.last_Sha = None
+app.state.seen_Sha = set()
 
 
 @app.get("/")
@@ -56,13 +56,13 @@ async def post_webhook(
         and payload.event.scope.startswith("repo.content")
         and payload.repo.type == "dataset"
         # webhook posts multiple requests with the same update, this addresses that
-        and (not app.state.last_Sha or app.state.last_Sha != payload.repo.headSha)
+        and payload.repo.headSha not in app.state.last_Sha
     ):
         # no-op
         logger.info("Update detected, no action taken")
         return {"processed": False}
 
-    app.state.last_Sha = payload.repo.headSha
+    app.state.last_Sha.add(payload.repo.headSha)
     task_queue.add_task(chunk_dataset, ds_name=payload.repo.name)
     task_queue.add_task(embed_dataset, ds_name=CHUNKED_DS_NAME)
 
@@ -181,7 +181,7 @@ def wake_up_endpoint(url):
     ).status_code != 200:
         time.sleep(2)
         n_loop += 1
-        if n_loop > 30:
+        if n_loop > 40:
             raise TimeoutError("TEI endpoint is unavailable")
     logger.info("TEI endpoint is up")
 
