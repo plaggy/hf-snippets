@@ -7,8 +7,10 @@ import os
 import tempfile
 import requests
 
-from fastapi import FastAPI, BackgroundTasks
-from fastapi.responses import FileResponse
+from fastapi import FastAPI, Request, BackgroundTasks
+from fastapi.responses import HTMLResponse
+from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
 
 from aiohttp import ClientSession
 from langchain.text_splitter import RecursiveCharacterTextSplitter
@@ -16,7 +18,7 @@ from datasets import Dataset, load_dataset
 from tqdm import tqdm
 from tqdm.asyncio import tqdm_asyncio
 
-from src.models import chunk_config, embed_config, WebhookPayload
+from models import chunk_config, embed_config, WebhookPayload
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -35,15 +37,18 @@ INPUT_SPLITS = os.getenv("INPUT_SPLITS")
 # name of column to load from input dataset
 INPUT_TEXT_COL = os.getenv("INPUT_TEXT_COL")
 
-INPUT_SPLITS = [spl.strip() for spl in INPUT_SPLITS.split(",") if spl]
+# INPUT_SPLITS = [spl.strip() for spl in INPUT_SPLITS.split(",") if spl]
 
 app = FastAPI()
 app.state.seen_Sha = set()
 
+app.mount("/static", StaticFiles(directory="static"), name="static")
+templates = Jinja2Templates(directory="templates")
 
-@app.get("/")
-async def home():
-    return FileResponse("home.html")
+@app.get("/", response_class=HTMLResponse)
+async def root(request: Request):
+    return templates.TemplateResponse(request=request, name="index.html")
+    # return FileResponse("/Users/spetrov/Documents/PROJECTS/hub_etl_pipeline/auto-chunk-embed/templates/index.html")
 
 
 @app.post("/webhook")
@@ -56,13 +61,13 @@ async def post_webhook(
         and payload.event.scope.startswith("repo.content")
         and payload.repo.type == "dataset"
         # webhook posts multiple requests with the same update, this addresses that
-        and payload.repo.headSha not in app.state.last_Sha
+        and payload.repo.headSha not in app.state.seen_Sha
     ):
         # no-op
         logger.info("Update detected, no action taken")
         return {"processed": False}
 
-    app.state.last_Sha.add(payload.repo.headSha)
+    app.state.seen_Sha.add(payload.repo.headSha)
     task_queue.add_task(chunk_dataset, ds_name=payload.repo.name)
     task_queue.add_task(embed_dataset, ds_name=CHUNKED_DS_NAME)
 
@@ -206,6 +211,6 @@ def embed_dataset(ds_name):
 
 # For debugging
 
-# import uvicorn
-# if __name__ == "__main__":
-#     uvicorn.run(app, host="0.0.0.0", port=7860)
+import uvicorn
+if __name__ == "__main__":
+    uvicorn.run(app, host="0.0.0.0", port=7860)

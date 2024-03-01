@@ -34,10 +34,10 @@ class WebhookPayload(BaseModel):
 	repo: WebhookPayloadRepo
 
 
-with open(os.path.join(os.getcwd(), "chunk_config.json")) as c:
+with open(os.path.join(os.getcwd(), "configs/chunk_config.json")) as c:
 	data = json.load(c)
 	chunk_config = ChunkConfig.model_validate_json(json.dumps(data))
 
-with open(os.path.join(os.getcwd(), "embed_config.json")) as c:
+with open(os.path.join(os.getcwd(), "configs/embed_config.json")) as c:
 	data = json.load(c)
 	embed_config = EmbedConfig.model_validate_json(json.dumps(data))
